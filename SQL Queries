@@ -1,0 +1,69 @@
+USE [Portfolio]
+GO
+
+SELECT *
+FROM [dbo].[SMDataMH2021$]
+GO
+
+/-----Energy Estimate---------------------------------------------
+SELECT [x_Timestamp]
+      ,[t_kWh] * 0.15 AS Cost
+FROM [dbo].[SMDataMH2021$];
+ 
+ALTER TABLE [dbo].[SMDataMH2021$]
+ADD Cost FLOAT;
+
+UPDATE [dbo].[SMDataMH2021$]
+SET Cost = [t_kWh] * 0.15
+
+
+/-----Monthly cost calculation-----------------------
+SELECT 
+    meter,
+    FORMAT(x_Timestamp, 'yyyy-MM') AS Month, 
+    ROUND(SUM(t_kWh), 2) AS Total_kWh,
+    ROUND(SUM(t_kWh) * 0.15, 2) AS Total_Cost
+FROM 
+    [dbo].[SMDataMH2021$]
+GROUP BY 
+    meter, 
+    FORMAT(x_Timestamp, 'yyyy-MM')
+ORDER BY 
+    meter, 
+    Month;
+
+ALTER TABLE [dbo].[SMDataMH2021$]
+ADD Month FLOAT,
+	Total_kWh FLOAT,
+	Total_Cost FLOAT;
+
+ALTER TABLE [dbo].[SMDataMH2021$]
+ALTER COLUMN Month NVARCHAR(7);
+
+
+UPDATE [dbo].[SMDataMH2021$]
+SET Month = FORMAT(x_Timestamp, 'yyyy-MM');
+
+
+WITH MonthlyTotals AS (
+    SELECT 
+        meter,
+        FORMAT(x_Timestamp, 'yyyy-MM') AS Month, 
+        ROUND(SUM(t_kWh), 2) AS Total_kWh,
+        ROUND(SUM(t_kWh) * 0.15, 2) AS Total_Cost
+    FROM 
+        [dbo].[SMDataMH2021$]
+    GROUP BY 
+        meter, 
+        FORMAT(x_Timestamp, 'yyyy-MM')
+)
+UPDATE s
+SET 
+    s.Total_kWh = mt.Total_kWh,
+    s.Total_Cost = mt.Total_Cost
+FROM 
+    [dbo].[SMDataMH2021$] s
+INNER JOIN 
+    MonthlyTotals mt
+ON 
+    s.meter = mt.meter AND FORMAT(s.x_Timestamp, 'yyyy-MM') = mt.Month;
